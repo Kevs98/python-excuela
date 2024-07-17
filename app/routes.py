@@ -141,3 +141,26 @@ def update_user_info():
 
     mongo.db.user.update_one({"_id": user_id_obj}, {"$set": updated_data})
     return jsonify({"message": "User updated successfully"}), 200
+
+
+@user_bp.route("/user", methods=["DELETE"])
+def delete_auth_user():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        return jsonify({"message": "Missing Authorization Header"}), 401
+
+    auth_token = auth_header.split(" ")[1]
+    user_id = User.decode_auth_token(auth_token)
+
+    if not user_id:
+        return jsonify({"message": "Invalid token"}), 401
+
+    user_id_obj = ObjectId(user_id)
+    user_data = mongo.db.user.find_one({"_id": user_id_obj})
+
+    if not user_data:
+        return jsonify({"message": "User not found"}), 404
+
+    mongo.db.user.delete_one({"_id": user_id_obj})
+
+    return jsonify({"message": "User deleted successfully"}), 200
