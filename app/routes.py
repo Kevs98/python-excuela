@@ -1,14 +1,16 @@
 from flask import Blueprint, request, jsonify
 from app.models import User
+from app import mongo
+from bson import ObjectId
 
 # main = Blueprint("main", __name__)
 register_bp = Blueprint("/register_bp", __name__)
 login_bp = Blueprint("/login_bp", __name__)
+user_bp = Blueprint("/user_bp", __name__)
 
 
 @register_bp.route("/register", methods=["POST"])
 def register():
-    from app import mongo
 
     data = request.json
 
@@ -47,7 +49,6 @@ def register():
 
 @login_bp.route("/login", methods=["POST"])
 def login():
-    from app import mongo
 
     data = request.json
 
@@ -75,3 +76,41 @@ def login():
     # Generate JWT token
     auth_token = user.encode_auth_token(str(user_data["_id"]))
     return jsonify({"token": auth_token}), 200
+
+
+@user_bp.route("/user", methods=["GET"])
+def get_user_info():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        return jsonify({"message": "Missing Authorization Header"}), 401
+
+    auth_token = auth_header.split(" ")[1]
+    user_id = User.decode_auth_token(auth_token)
+    print(user_id)
+
+    if not user_id:
+        return jsonify({"message": "Invalid token"}), 401
+
+    try:
+        user_id_obj = ObjectId(user_id)
+    except Exception as e:
+        print(f"Error converting user_id to ObjectId: {str(e)}")
+        return jsonify({"message": "Invalid user ID format"}), 400
+
+    # Fetch data of the user in database
+    user_data = mongo.db.user.find_one({"_id": user_id_obj})
+    if not user_data:
+        return jsonify({"message": "User not found"}), 404
+
+    # Convert bytes fields to string
+    def convert_bytes_to_string(data):
+        for key, value in data.items():
+            if isinstance(value, bytes):
+                data[key] = value.decode("utf-8")
+        return data
+
+    user_data = convert_bytes_to_string(user_data)
+
+    user_data["_id"] = str(user_data["_id"])
+
+    return jsonify(user_data), 200

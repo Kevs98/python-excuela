@@ -24,7 +24,7 @@ class User:
     def to_dict(self):
         return {
             "username": self.username,
-            "password_hash": self.password_hash,
+            "password_hash": generate_password_hash(self.password_hash),
             "email": self.email,
             "created_at": self.created_at,
         }
@@ -40,17 +40,22 @@ class User:
                 "sub": user_id,
             }
             return jwt.encode(
-                payload, current_app.config.get("SECRET_KEY"), algorithm="HS256"
+                payload, current_app.config.get("JWT_KEY"), algorithm="HS256"
             )
         except Exception as e:
             return str(e)
 
     @staticmethod
-    def decode_auth_token(auth_toke):
+    def decode_auth_token(auth_token):
         try:
-            payload = jwt.decode(auth_toke, current_app.config.get("SECRET_KEY"))
+            algorithms = ["HS256"]
+            payload = jwt.decode(
+                auth_token, current_app.config.get("JWT_KEY"), algorithms=algorithms
+            )
             return payload["sub"]
-        except jwt.ExpiredSignatureError:
+        except jwt.ExpiredSignatureError as e:
+            print(e)
             return "Signature expired. Please log in again."
-        except jwt.InvalidTokenError:
+        except jwt.InvalidTokenError as e:
+            print(e)
             return "Invalid token. Please log in again."
