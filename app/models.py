@@ -1,13 +1,15 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from flask_pymongo import pymongo
 from bson import ObjectId
 from flask_bcrypt import generate_password_hash, check_password_hash
+import jwt
+from flask import current_app
 
 
 class User:
     def __init__(self, username, password_hash, email):
         self.username = username
-        self.password_hash = generate_password_hash(password_hash).decode("utf-8")
+        self.password_hash = password_hash
         self.email = email
         self.created_at = datetime.utcnow()
 
@@ -28,4 +30,27 @@ class User:
         }
 
     def check_password(self, password_hash):
-        return check_password_hash(self.password_hash, password_hash)
+        return check_password_hash(self.password_hash, password_hash.encode("utf-8"))
+
+    def encode_auth_token(self, user_id):
+        try:
+            payload = {
+                "exp": datetime.now(timezone.utc) + timedelta(days=1),
+                "iat": datetime.now(timezone.utc),
+                "sub": user_id,
+            }
+            return jwt.encode(
+                payload, current_app.config.get("SECRET_KEY"), algorithm="HS256"
+            )
+        except Exception as e:
+            return str(e)
+
+    @staticmethod
+    def decode_auth_token(auth_toke):
+        try:
+            payload = jwt.decode(auth_toke, current_app.config.get("SECRET_KEY"))
+            return payload["sub"]
+        except jwt.ExpiredSignatureError:
+            return "Signature expired. Please log in again."
+        except jwt.InvalidTokenError:
+            return "Invalid token. Please log in again."
