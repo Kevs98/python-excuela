@@ -114,3 +114,30 @@ def get_user_info():
     user_data["_id"] = str(user_data["_id"])
 
     return jsonify(user_data), 200
+
+
+@user_bp.route("/user", methods=["PUT"])
+def update_user_info():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        return jsonify({"message": "Missing Authorization Header"}), 401
+
+    auth_token = auth_header.split(" ")[1]
+    user_id = User.decode_auth_token(auth_token)
+
+    if not user_id:
+        return jsonify({"message": "Invalid token"}), 401
+
+    data = request.json
+    if not data or "username" not in data or "email" not in data:
+        return jsonify({"message": "Missing username or email"}), 400
+
+    user_id_obj = ObjectId(user_id)
+    user_data = mongo.db.user.find_one({"_id": user_id_obj})
+    if not user_data:
+        return jsonify({"message": "User not found"}), 404
+
+    updated_data = {"username": data["username"], "email": data["email"]}
+
+    mongo.db.user.update_one({"_id": user_id_obj}, {"$set": updated_data})
+    return jsonify({"message": "User updated successfully"}), 200
